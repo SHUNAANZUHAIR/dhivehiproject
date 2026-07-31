@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dhivehi AI — Translate &amp; Write</title>
+<title>DhivehiProject — Translate &amp; Write in Dhivehi</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thaana&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -46,11 +46,36 @@
     padding:14px 18px;
     flex-shrink:0;
   }
-  .brand{
-    font-size:17px;
-    font-weight:600;
-    letter-spacing:.01em;
+  .logo{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    text-decoration:none;
   }
+  .logo-mark{
+    width:26px;
+    height:26px;
+    border-radius:8px;
+    flex-shrink:0;
+    background:linear-gradient(135deg,var(--accent),var(--accent-dark));
+    color:#04211f;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Noto Sans Thaana','MV Boli',sans-serif;
+    font-size:15px;
+    font-weight:700;
+  }
+  .logo-word{
+    font-size:18px;
+    font-weight:700;
+    letter-spacing:-.01em;
+    white-space:nowrap;
+  }
+  .logo-word .w1{color:var(--text);}
+  .logo-word .w2{color:var(--accent);}
+  .logo.lg .logo-mark{width:44px;height:44px;border-radius:12px;font-size:24px;}
+  .logo.lg .logo-word{font-size:30px;}
   .icon-btn{
     background:transparent;
     border:1px solid var(--border);
@@ -296,13 +321,24 @@
   }
   .send-btn:disabled{background:#454545;color:#7a7a7a;cursor:not-allowed;}
   .send-btn:not(:disabled):hover{background:var(--accent-dark);}
+
+  .footer-note{
+    text-align:center;
+    font-size:11.5px;
+    color:var(--muted);
+    margin-top:10px;
+    line-height:1.5;
+  }
 </style>
 </head>
 <body>
 <div class="app">
 
   <div class="topbar">
-    <div class="brand">ދިވެހި AI</div>
+    <div class="logo">
+      <span class="logo-mark">ދ</span>
+      <span class="logo-word"><span class="w1">Dhivehi</span><span class="w2">Project</span></span>
+    </div>
     <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
   </div>
 
@@ -331,7 +367,10 @@
 
   <main class="thread" id="thread">
     <div class="empty-state" id="emptyState">
-      <div class="empty-title">ދިވެހި AI</div>
+      <div class="logo lg" style="justify-content:center;margin-bottom:14px;">
+        <span class="logo-mark">ދ</span>
+        <span class="logo-word"><span class="w1">Dhivehi</span><span class="w2">Project</span></span>
+      </div>
       <div class="empty-sub">Translate between English and Dhivehi, or write original Dhivehi content — essays, letters, speeches, and more.</div>
     </div>
   </main>
@@ -374,6 +413,7 @@
       <textarea id="promptInput" rows="1" placeholder="Type text to translate..."></textarea>
       <button class="send-btn" id="sendBtn" disabled>↑</button>
     </div>
+    <div class="footer-note">DhivehiProject can make mistakes. Please double-check important translations.</div>
   </div>
 
 </div>
