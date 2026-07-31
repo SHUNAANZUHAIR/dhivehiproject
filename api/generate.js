@@ -8,6 +8,14 @@ const ENV_MAP = {
 // env vars. Resets at midnight UTC (see get_today_usage() in Supabase).
 const DAILY_TOKEN_LIMIT = parseInt(process.env.DAILY_TOKEN_LIMIT, 10) || 100000;
 
+// Comma-separated list of admin emails (set ADMIN_EMAILS in Vercel env vars).
+// Admins get the raw provider response + token counts back in the API
+// response for their own requests only — regular users never see this.
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(Boolean);
+
 // Verifies the caller's Supabase access token against Supabase's Auth
 // service. If SUPABASE_URL / SUPABASE_ANON_KEY aren't configured yet, auth
 // enforcement (and usage tracking) is skipped so the app doesn't hard-break
@@ -15,7 +23,9 @@ const DAILY_TOKEN_LIMIT = parseInt(process.env.DAILY_TOKEN_LIMIT, 10) || 100000;
 async function requireAuth(req) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) return { ok: true, token: null, supabaseUrl: null, supabaseAnonKey: null };
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return { ok: true, token: null, supabaseUrl: null, supabaseAnonKey: null, email: null };
+  }
 
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -26,7 +36,9 @@ async function requireAuth(req) {
       headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnonKey }
     });
     if (!r.ok) return { ok: false, error: 'Your session has expired. Please sign in again.' };
-    return { ok: true, token, supabaseUrl, supabaseAnonKey };
+    const userData = await r.json().catch(() => null);
+    const email = (userData && userData.email) || null;
+    return { ok: true, token, supabaseUrl, supabaseAnonKey, email };
   } catch (err) {
     return { ok: false, error: 'Could not verify your session. Please try again.' };
   }
@@ -78,6 +90,8 @@ export default async function handler(req, res) {
     return;
   }
 
+  const isAdmin = !!(auth.email && ADMIN_EMAILS.includes(auth.email.toLowerCase()));
+
   const { provider, model, system, message, apiKeyOverride } = req.body || {};
 
   if (!provider || !model || !message) {
@@ -125,11 +139,36 @@ export default async function handler(req, res) {
       await addUsage(auth.supabaseUrl, auth.supabaseAnonKey, auth.token, requestTokens);
     }
 
+    // Normalize each provider's usage object into Gemini-style field names
+    // for the admin debug payload, while still keeping the raw response
+    // exactly as the provider sent it.
+    const rawUsage = (result.raw && (result.raw.usageMetadata || result.raw.usage)) || null;
+    const promptTokenCount = rawUsage
+      ? (rawUsage.promptTokenCount ?? rawUsage.input_tokens ?? rawUsage.prompt_tokens ?? null)
+      : null;
+    const candidatesTokenCount = rawUsage
+      ? (rawUsage.candidatesTokenCount ?? rawUsage.output_tokens ?? rawUsage.completion_tokens ?? null)
+      : null;
+    const totalTokenCount = rawUsage
+      ? (rawUsage.totalTokenCount ?? rawUsage.total_tokens ?? requestTokens)
+      : requestTokens;
+
     res.status(200).json({
       text: result.text,
       usage: usageTrackingEnabled
         ? { tokensUsed: newTotal, limit: DAILY_TOKEN_LIMIT, lastRequestTokens: requestTokens }
-        : null
+        : null,
+      debug: isAdmin
+        ? {
+            provider,
+            model,
+            usageMetadata: rawUsage,
+            promptTokenCount,
+            candidatesTokenCount,
+            totalTokenCount,
+            rawResponse: result.raw
+          }
+        : undefined
     });
   } catch (err) {
     res.status(500).json({ error: (err && err.message) || 'Unknown error calling provider.' });
@@ -155,7 +194,7 @@ async function callAnthropic(model, key, system, message) {
   if (!r.ok) throw new Error((data && data.error && data.error.message) || `Anthropic HTTP ${r.status}`);
   const text = (data.content && data.content[0] && data.content[0].text) || '';
   const totalTokens = (data.usage && ((data.usage.input_tokens || 0) + (data.usage.output_tokens || 0))) || 0;
-  return { text, totalTokens };
+  return { text, totalTokens, raw: data };
 }
 
 async function callOpenAI(model, key, system, message) {
@@ -177,7 +216,7 @@ async function callOpenAI(model, key, system, message) {
   if (!r.ok) throw new Error((data && data.error && data.error.message) || `OpenAI HTTP ${r.status}`);
   const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
   const totalTokens = (data.usage && data.usage.total_tokens) || 0;
-  return { text, totalTokens };
+  return { text, totalTokens, raw: data };
 }
 
 async function callGemini(model, key, system, message) {
@@ -196,5 +235,5 @@ async function callGemini(model, key, system, message) {
   const parts = cand && cand.content && cand.content.parts;
   const text = (parts && parts.map(p => p.text || '').join('')) || '';
   const totalTokens = (data.usageMetadata && data.usageMetadata.totalTokenCount) || 0;
-  return { text, totalTokens };
+  return { text, totalTokens, raw: data };
 }
