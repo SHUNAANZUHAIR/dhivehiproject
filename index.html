@@ -173,6 +173,21 @@
     font-family:inherit;
   }
   .mini-btn:hover{color:var(--text);border-color:var(--muted);}
+  .debug-pre{
+    margin:8px 0 0 40px;
+    background:var(--panel-bg);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px;
+    font-size:11px;
+    line-height:1.5;
+    color:var(--muted);
+    max-height:320px;
+    overflow:auto;
+    white-space:pre-wrap;
+    word-break:break-word;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
 
   .typing{display:inline-flex;gap:4px;align-items:center;height:20px;}
   .typing span{
@@ -796,7 +811,7 @@ function addAssistantPlaceholder(){
   return wrap;
 }
 
-function fillAssistant(wrap, text, isDv, isError){
+function fillAssistant(wrap, text, isDv, isError, debug){
   const content = wrap.querySelector('.content');
   content.textContent = text;
   content.classList.toggle('dv-text', !!isDv && !isError);
@@ -815,7 +830,27 @@ function fillAssistant(wrap, text, isDv, isError){
       setTimeout(()=>{ copyBtn.textContent = 'Copy'; }, 1200);
     });
     actions.appendChild(copyBtn);
+
+    let debugPre = null;
+    if(debug){
+      debugPre = document.createElement('pre');
+      debugPre.className = 'debug-pre';
+      debugPre.style.display = 'none';
+      debugPre.textContent = JSON.stringify(debug, null, 2);
+
+      const debugBtn = document.createElement('button');
+      debugBtn.className = 'mini-btn';
+      debugBtn.textContent = 'Debug';
+      debugBtn.addEventListener('click', ()=>{
+        const showing = debugPre.style.display !== 'none';
+        debugPre.style.display = showing ? 'none' : 'block';
+        debugBtn.textContent = showing ? 'Debug' : 'Hide debug';
+      });
+      actions.appendChild(debugBtn);
+    }
+
     wrap.appendChild(actions);
+    if(debugPre) wrap.appendChild(debugPre);
   }
   scrollToBottom();
 }
@@ -862,7 +897,7 @@ async function handleSend(){
       renderUsage();
     }
     if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-    fillAssistant(placeholder, data.text || '(empty response)', isDvResult, false);
+    fillAssistant(placeholder, data.text || '(empty response)', isDvResult, false, data.debug);
   } catch(err){
     fillAssistant(placeholder, 'Error: ' + err.message, false, true);
   }
