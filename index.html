@@ -6,6 +6,7 @@
 <title>DhivehiProject — Translate &amp; Write in Dhivehi</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thaana&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root{
     --bg:#212121;
@@ -286,16 +287,161 @@
     margin-top:10px;
     line-height:1.5;
   }
+
+  /* ---- loading ---- */
+  .loading-view{
+    height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  /* ---- auth screen ---- */
+  .auth-view{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .auth-card{width:100%;max-width:360px;}
+  .google-btn{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    background:#fff;
+    color:#1f1f1f;
+    border:none;
+    border-radius:10px;
+    padding:11px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .google-btn:hover{background:#f1f1f1;}
+  .google-btn:disabled{opacity:.6;cursor:not-allowed;}
+  .auth-divider{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    color:var(--muted);
+    font-size:12px;
+    margin:18px 0;
+  }
+  .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+  .auth-field{margin-bottom:12px;}
+  .auth-field label{
+    display:block;
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:6px;
+    font-weight:600;
+  }
+  .auth-field input{
+    width:100%;
+    background:var(--composer-bg);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:14px;
+    font-family:inherit;
+  }
+  .auth-submit-btn{
+    width:100%;
+    background:var(--accent);
+    color:#04211f;
+    border:none;
+    border-radius:8px;
+    padding:11px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    font-family:inherit;
+    margin-top:4px;
+  }
+  .auth-submit-btn:hover{background:var(--accent-dark);}
+  .auth-submit-btn:disabled{opacity:.6;cursor:not-allowed;}
+  .auth-status{
+    font-size:12.5px;
+    color:var(--muted);
+    margin-top:14px;
+    text-align:center;
+    line-height:1.5;
+    min-height:16px;
+  }
+  .auth-status.error{color:var(--danger);}
+  .auth-status.success{color:var(--accent);}
+  .auth-toggle{text-align:center;font-size:13px;color:var(--muted);margin-top:20px;}
+  .auth-toggle button{
+    background:none;
+    border:none;
+    color:var(--accent);
+    font-weight:600;
+    cursor:pointer;
+    font-family:inherit;
+    font-size:13px;
+    margin-left:4px;
+  }
 </style>
 </head>
 <body>
-<div class="app">
+
+<div class="loading-view" id="loadingView">Loading…</div>
+
+<div class="auth-view" id="authView" style="display:none;">
+  <div class="auth-card">
+    <div class="logo lg" style="justify-content:center;margin-bottom:24px;">
+      <span class="logo-mark">ދ</span>
+      <span class="logo-word"><span class="w1">Dhivehi</span><span class="w2">Project</span></span>
+    </div>
+
+    <button class="google-btn" id="googleSignInBtn" type="button">
+      <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.83.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.97 10.71a5.4 5.4 0 0 1 0-3.42V4.96H.96a9 9 0 0 0 0 8.08l3.01-2.33z"/>
+        <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="auth-divider"><span>or</span></div>
+
+    <form id="authForm">
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="authEmail" required autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input type="password" id="authPassword" required autocomplete="current-password" minlength="6">
+      </div>
+      <button type="submit" class="auth-submit-btn" id="authSubmitBtn">Sign in</button>
+    </form>
+
+    <div class="auth-status" id="authStatus"></div>
+
+    <div class="auth-toggle">
+      <span id="authToggleText">Don't have an account?</span>
+      <button type="button" id="authToggleBtn">Sign up</button>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="appView" style="display:none;">
 
   <div class="topbar">
     <div class="logo">
       <span class="logo-mark">ދ</span>
       <span class="logo-word"><span class="w1">Dhivehi</span><span class="w2">Project</span></span>
     </div>
+    <button class="icon-btn" id="signOutBtn" title="Sign out" aria-label="Sign out">⏻</button>
   </div>
 
   <main class="thread" id="thread">
@@ -356,6 +502,112 @@
 // environment variables (see api/generate.js) — never exposed in the UI.
 const PROVIDER = 'google';
 const MODEL = 'gemini-3.6-flash';
+
+// =========================================================
+// Auth (Supabase) — gates the whole app behind sign-in
+// =========================================================
+let supabaseClient = null;
+let currentSession = null;
+let authMode = 'signin';
+
+const loadingView = document.getElementById('loadingView');
+const authView = document.getElementById('authView');
+const appView = document.getElementById('appView');
+const authStatusEl = document.getElementById('authStatus');
+
+function setAuthStatus(msg, kind){
+  authStatusEl.textContent = msg || '';
+  authStatusEl.classList.toggle('error', kind === 'error');
+  authStatusEl.classList.toggle('success', kind === 'success');
+}
+
+function renderAuthState(){
+  loadingView.style.display = 'none';
+  if(currentSession){
+    authView.style.display = 'none';
+    appView.style.display = 'flex';
+  } else {
+    appView.style.display = 'none';
+    authView.style.display = 'flex';
+  }
+}
+
+async function initAuth(){
+  let cfg = {};
+  try{
+    const r = await fetch('/api/config');
+    cfg = await r.json();
+  } catch(e){ /* ignore, handled below */ }
+
+  if(!cfg.supabaseUrl || !cfg.supabaseAnonKey){
+    loadingView.style.display = 'none';
+    appView.style.display = 'none';
+    authView.style.display = 'flex';
+    document.getElementById('googleSignInBtn').disabled = true;
+    document.getElementById('authSubmitBtn').disabled = true;
+    setAuthStatus('Sign-in is not configured yet. Add SUPABASE_URL and SUPABASE_ANON_KEY in this project’s Vercel settings, then redeploy.', 'error');
+    return;
+  }
+
+  supabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+
+  const { data } = await supabaseClient.auth.getSession();
+  currentSession = data.session;
+  renderAuthState();
+
+  supabaseClient.auth.onAuthStateChange((_event, session)=>{
+    currentSession = session;
+    renderAuthState();
+  });
+}
+
+document.getElementById('googleSignInBtn').addEventListener('click', async ()=>{
+  if(!supabaseClient) return;
+  await supabaseClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin }
+  });
+});
+
+document.getElementById('authForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!supabaseClient) return;
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const btn = document.getElementById('authSubmitBtn');
+  btn.disabled = true;
+  setAuthStatus('');
+  try{
+    if(authMode === 'signin'){
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+    } else {
+      const { data, error } = await supabaseClient.auth.signUp({ email, password });
+      if(error) throw error;
+      if(data.user && !data.session){
+        setAuthStatus('Account created — check your email to confirm it before signing in.', 'success');
+      }
+    }
+  } catch(err){
+    setAuthStatus(err.message, 'error');
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('authToggleBtn').addEventListener('click', ()=>{
+  authMode = authMode === 'signin' ? 'signup' : 'signin';
+  document.getElementById('authSubmitBtn').textContent = authMode === 'signin' ? 'Sign in' : 'Create account';
+  document.getElementById('authToggleText').textContent = authMode === 'signin' ? "Don't have an account?" : 'Already have an account?';
+  document.getElementById('authToggleBtn').textContent = authMode === 'signin' ? 'Sign up' : 'Sign in';
+  setAuthStatus('');
+});
+
+document.getElementById('signOutBtn').addEventListener('click', async ()=>{
+  if(!supabaseClient) return;
+  await supabaseClient.auth.signOut();
+});
+
+initAuth();
 
 // ---- Mode switch (Translate / Write) ----
 let currentMode = 'translate';
@@ -482,9 +734,13 @@ async function handleSend(){
   }
 
   try{
+    const headers = { 'content-type': 'application/json' };
+    if(currentSession && currentSession.access_token){
+      headers['Authorization'] = 'Bearer ' + currentSession.access_token;
+    }
     const res = await fetch('/api/generate', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers,
       body: JSON.stringify({ provider: PROVIDER, model: MODEL, system, message: text })
     });
     const data = await res.json();
