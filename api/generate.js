@@ -4,14 +4,18 @@ const ENV_MAP = {
   google: 'GOOGLE_API_KEY'
 };
 
+// Daily per-user token allowance. Override with DAILY_TOKEN_LIMIT in Vercel
+// env vars. Resets at midnight UTC (see get_today_usage() in Supabase).
+const DAILY_TOKEN_LIMIT = parseInt(process.env.DAILY_TOKEN_LIMIT, 10) || 100000;
+
 // Verifies the caller's Supabase access token against Supabase's Auth
 // service. If SUPABASE_URL / SUPABASE_ANON_KEY aren't configured yet, auth
-// enforcement is skipped here (the frontend's own gate is the only check
-// until sign-in is fully wired up) so the app doesn't hard-break mid-setup.
+// enforcement (and usage tracking) is skipped so the app doesn't hard-break
+// mid-setup.
 async function requireAuth(req) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) return { ok: true };
+  if (!supabaseUrl || !supabaseAnonKey) return { ok: true, token: null, supabaseUrl: null, supabaseAnonKey: null };
 
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -22,9 +26,43 @@ async function requireAuth(req) {
       headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnonKey }
     });
     if (!r.ok) return { ok: false, error: 'Your session has expired. Please sign in again.' };
-    return { ok: true };
+    return { ok: true, token, supabaseUrl, supabaseAnonKey };
   } catch (err) {
     return { ok: false, error: 'Could not verify your session. Please try again.' };
+  }
+}
+
+// Reads today's token usage for the signed-in user via the get_today_usage()
+// Postgres function (runs with the user's own JWT, so it's automatically
+// scoped to them). Fails open (returns 0) if anything goes wrong.
+async function getTodayUsage(supabaseUrl, anonKey, token) {
+  try {
+    const r = await fetch(`${supabaseUrl}/rest/v1/rpc/get_today_usage`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, apikey: anonKey, 'content-type': 'application/json' },
+      body: '{}'
+    });
+    if (!r.ok) return 0;
+    const val = await r.json();
+    return typeof val === 'number' ? val : 0;
+  } catch (err) {
+    return 0;
+  }
+}
+
+// Adds tokens to today's usage row via the increment_usage() Postgres
+// function. Best-effort — a failure here shouldn't break the user's
+// response, just means the usage counter may lag slightly.
+async function addUsage(supabaseUrl, anonKey, token, tokens) {
+  if (!tokens) return;
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/rpc/increment_usage`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, apikey: anonKey, 'content-type': 'application/json' },
+      body: JSON.stringify({ p_tokens: tokens })
+    });
+  } catch (err) {
+    // ignore — best effort
   }
 }
 
@@ -61,12 +99,38 @@ export default async function handler(req, res) {
     return;
   }
 
+  const usageTrackingEnabled = !!(auth.token && auth.supabaseUrl && auth.supabaseAnonKey);
+  let usedSoFar = 0;
+  if (usageTrackingEnabled) {
+    usedSoFar = await getTodayUsage(auth.supabaseUrl, auth.supabaseAnonKey, auth.token);
+    if (usedSoFar >= DAILY_TOKEN_LIMIT) {
+      res.status(429).json({
+        error: `Daily usage limit reached (${DAILY_TOKEN_LIMIT.toLocaleString()} tokens). It resets at midnight UTC.`,
+        usage: { tokensUsed: usedSoFar, limit: DAILY_TOKEN_LIMIT }
+      });
+      return;
+    }
+  }
+
   try {
-    let text;
-    if (provider === 'anthropic') text = await callAnthropic(model, key, system, message);
-    else if (provider === 'openai') text = await callOpenAI(model, key, system, message);
-    else if (provider === 'google') text = await callGemini(model, key, system, message);
-    res.status(200).json({ text });
+    let result;
+    if (provider === 'anthropic') result = await callAnthropic(model, key, system, message);
+    else if (provider === 'openai') result = await callOpenAI(model, key, system, message);
+    else if (provider === 'google') result = await callGemini(model, key, system, message);
+    else throw new Error('Unknown provider: ' + provider);
+
+    const requestTokens = result.totalTokens || 0;
+    const newTotal = usedSoFar + requestTokens;
+    if (usageTrackingEnabled && requestTokens) {
+      await addUsage(auth.supabaseUrl, auth.supabaseAnonKey, auth.token, requestTokens);
+    }
+
+    res.status(200).json({
+      text: result.text,
+      usage: usageTrackingEnabled
+        ? { tokensUsed: newTotal, limit: DAILY_TOKEN_LIMIT, lastRequestTokens: requestTokens }
+        : null
+    });
   } catch (err) {
     res.status(500).json({ error: (err && err.message) || 'Unknown error calling provider.' });
   }
@@ -89,7 +153,9 @@ async function callAnthropic(model, key, system, message) {
   });
   const data = await r.json();
   if (!r.ok) throw new Error((data && data.error && data.error.message) || `Anthropic HTTP ${r.status}`);
-  return (data.content && data.content[0] && data.content[0].text) || '';
+  const text = (data.content && data.content[0] && data.content[0].text) || '';
+  const totalTokens = (data.usage && ((data.usage.input_tokens || 0) + (data.usage.output_tokens || 0))) || 0;
+  return { text, totalTokens };
 }
 
 async function callOpenAI(model, key, system, message) {
@@ -109,7 +175,9 @@ async function callOpenAI(model, key, system, message) {
   });
   const data = await r.json();
   if (!r.ok) throw new Error((data && data.error && data.error.message) || `OpenAI HTTP ${r.status}`);
-  return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  const totalTokens = (data.usage && data.usage.total_tokens) || 0;
+  return { text, totalTokens };
 }
 
 async function callGemini(model, key, system, message) {
@@ -126,5 +194,7 @@ async function callGemini(model, key, system, message) {
   if (!r.ok) throw new Error((data && data.error && data.error.message) || `Gemini HTTP ${r.status}`);
   const cand = data.candidates && data.candidates[0];
   const parts = cand && cand.content && cand.content.parts;
-  return (parts && parts.map(p => p.text || '').join('')) || '';
+  const text = (parts && parts.map(p => p.text || '').join('')) || '';
+  const totalTokens = (data.usageMetadata && data.usageMetadata.totalTokenCount) || 0;
+  return { text, totalTokens };
 }

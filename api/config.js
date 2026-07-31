@@ -4,6 +4,7 @@
 export default function handler(req, res) {
   res.status(200).json({
     supabaseUrl: process.env.SUPABASE_URL || null,
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || null
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || null,
+    dailyTokenLimit: parseInt(process.env.DAILY_TOKEN_LIMIT, 10) || 100000
   });
 }
