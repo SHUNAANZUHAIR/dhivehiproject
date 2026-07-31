@@ -92,49 +92,6 @@
   .icon-btn:hover{color:var(--text);border-color:var(--muted);}
   .icon-btn.small{width:28px;height:28px;font-size:13px;border:none;background:transparent;}
 
-  /* ---- settings panel ---- */
-  .settings-panel{
-    margin:0 18px 12px;
-    background:var(--panel-bg);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:16px;
-    flex-shrink:0;
-  }
-  .settings-panel.hidden{display:none;}
-  .settings-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
-  .field{flex:1;min-width:150px;}
-  .field label{
-    display:block;
-    font-size:11px;
-    color:var(--muted);
-    margin-bottom:5px;
-    font-weight:600;
-    letter-spacing:.03em;
-    text-transform:uppercase;
-  }
-  select, input[type=password]{
-    width:100%;
-    background:#232323;
-    border:1px solid var(--border);
-    color:var(--text);
-    border-radius:8px;
-    padding:8px 10px;
-    font-size:13px;
-    font-family:inherit;
-  }
-  label.chk{
-    font-size:12px;
-    color:var(--muted);
-    display:flex;
-    align-items:center;
-    gap:6px;
-    cursor:pointer;
-    margin-top:8px;
-  }
-  .status{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
-  .status.error{color:var(--danger);}
-
   /* ---- thread ---- */
   .thread{
     flex:1;
@@ -339,30 +296,6 @@
       <span class="logo-mark">ދ</span>
       <span class="logo-word"><span class="w1">Dhivehi</span><span class="w2">Project</span></span>
     </div>
-    <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
-  </div>
-
-  <div class="settings-panel hidden" id="settingsPanel">
-    <div class="settings-row">
-      <div class="field">
-        <label>Provider</label>
-        <select id="provider">
-          <option value="anthropic">Anthropic (Claude)</option>
-          <option value="openai">OpenAI (ChatGPT)</option>
-          <option value="google" selected>Google (Gemini)</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Model</label>
-        <select id="model"></select>
-      </div>
-    </div>
-    <div class="field">
-      <label>Personal API key override (optional)</label>
-      <input type="password" id="apiKey" placeholder="Leave blank to use the server key">
-      <label class="chk"><input type="checkbox" id="rememberKey"> remember in this browser</label>
-    </div>
-    <div class="status" id="keyHint"></div>
   </div>
 
   <main class="thread" id="thread">
@@ -419,86 +352,10 @@
 </div>
 
 <script>
-// ---- Provider / model catalog ----
-const PROVIDERS = {
-  anthropic: { label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', keyPlaceholder: 'sk-ant-... (optional override)',
-    models: [
-      { value: 'claude-sonnet-5', label: 'Claude Sonnet 5 (recommended)' },
-      { value: 'claude-opus-5', label: 'Claude Opus 5 (highest quality)' },
-      { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest / cheapest)' }
-    ]
-  },
-  openai: { label: 'OpenAI', envVar: 'OPENAI_API_KEY', keyPlaceholder: 'sk-... (optional override)',
-    models: [
-      { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra (recommended)' },
-      { value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol (highest quality)' },
-      { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna (fastest / cheapest)' }
-    ]
-  },
-  google: { label: 'Google', envVar: 'GOOGLE_API_KEY', keyPlaceholder: 'AIza... (optional override)',
-    models: [
-      { value: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (recommended)' },
-      { value: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (highest quality)' },
-      { value: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite (fastest / cheapest)' }
-    ]
-  }
-};
-
-const providerSelect = document.getElementById('provider');
-const modelSelect = document.getElementById('model');
-const apiKeyInput = document.getElementById('apiKey');
-const rememberKey = document.getElementById('rememberKey');
-const keyHint = document.getElementById('keyHint');
-const settingsBtn = document.getElementById('settingsBtn');
-const settingsPanel = document.getElementById('settingsPanel');
-
-function keyStorageKey(){ return 'dhivehi_ai_key_override_' + providerSelect.value; }
-
-function populateModels(){
-  const cfg = PROVIDERS[providerSelect.value];
-  modelSelect.innerHTML = '';
-  cfg.models.forEach(m=>{
-    const opt = document.createElement('option');
-    opt.value = m.value;
-    opt.textContent = m.label;
-    modelSelect.appendChild(opt);
-  });
-}
-function updateKeyUI(){
-  const cfg = PROVIDERS[providerSelect.value];
-  apiKeyInput.placeholder = cfg.keyPlaceholder;
-  keyHint.textContent = 'Uses the ' + cfg.envVar + ' variable configured in Vercel by default. Only paste a key above if you want to override it for this browser.';
-  keyHint.classList.remove('error');
-}
-function loadKeyForProvider(){
-  const saved = localStorage.getItem(keyStorageKey());
-  if(saved){ apiKeyInput.value = saved; rememberKey.checked = true; }
-  else { apiKeyInput.value = ''; rememberKey.checked = false; }
-}
-function persistKeyIfNeeded(){
-  if (rememberKey.checked) localStorage.setItem(keyStorageKey(), apiKeyInput.value);
-  else localStorage.removeItem(keyStorageKey());
-}
-providerSelect.addEventListener('change', ()=>{
-  localStorage.setItem('dhivehi_ai_provider', providerSelect.value);
-  populateModels(); updateKeyUI(); loadKeyForProvider();
-});
-apiKeyInput.addEventListener('input', persistKeyIfNeeded);
-rememberKey.addEventListener('change', persistKeyIfNeeded);
-
-const savedProvider = localStorage.getItem('dhivehi_ai_provider');
-if (savedProvider && PROVIDERS[savedProvider]) providerSelect.value = savedProvider;
-populateModels(); updateKeyUI(); loadKeyForProvider();
-
-settingsBtn.addEventListener('click', (e)=>{
-  e.stopPropagation();
-  settingsPanel.classList.toggle('hidden');
-});
-document.addEventListener('click', (e)=>{
-  if(!settingsPanel.classList.contains('hidden') && !settingsPanel.contains(e.target) && e.target!==settingsBtn){
-    settingsPanel.classList.add('hidden');
-  }
-});
+// Backend provider/model is fixed and configured server-side via Vercel
+// environment variables (see api/generate.js) — never exposed in the UI.
+const PROVIDER = 'google';
+const MODEL = 'gemini-3.6-flash';
 
 // ---- Mode switch (Translate / Write) ----
 let currentMode = 'translate';
@@ -624,15 +481,11 @@ async function handleSend(){
     system = `You are a skilled native Dhivehi writer. Write fluent, natural, grammatically correct Dhivehi using proper Thaana script. Do not transliterate or use Latin characters. The content type is: ${type}. Target length: ${length}. Tone: ${tone}. Output ONLY the finished Dhivehi content, with no English preamble, explanation, or notes.`;
   }
 
-  const provider = providerSelect.value;
-  const model = modelSelect.value;
-  const overrideKey = apiKeyInput.value.trim();
-
   try{
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ provider, model, system, message: text, apiKeyOverride: overrideKey || undefined })
+      body: JSON.stringify({ provider: PROVIDER, model: MODEL, system, message: text })
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
