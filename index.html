@@ -388,6 +388,66 @@
     font-size:13px;
     margin-left:4px;
   }
+
+  /* ---- topbar actions / usage ---- */
+  .topbar-actions{display:flex;align-items:center;gap:8px;}
+  .usage-pill{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--muted);
+    padding:6px 13px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .usage-pill:hover{color:var(--text);border-color:var(--muted);}
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.55);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:50;
+  }
+  .modal-card{
+    width:100%;
+    max-width:340px;
+    background:var(--panel-bg);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:22px;
+  }
+  .modal-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:15px;
+    font-weight:700;
+    margin-bottom:18px;
+  }
+  .usage-bar-track{
+    width:100%;
+    height:10px;
+    border-radius:999px;
+    background:var(--composer-bg);
+    border:1px solid var(--border);
+    overflow:hidden;
+    margin-bottom:10px;
+  }
+  .usage-bar-fill{
+    height:100%;
+    background:var(--accent);
+    border-radius:999px;
+    width:0%;
+    transition:width .3s ease;
+  }
+  .usage-bar-fill.near-limit{background:var(--danger);}
+  .usage-text{font-size:13.5px;color:var(--text);margin-bottom:4px;}
+  .usage-note{font-size:11.5px;color:var(--muted);line-height:1.5;}
 </style>
 </head>
 <body>
@@ -441,7 +501,22 @@
       <span class="logo-mark">ދ</span>
       <span class="logo-word"><span class="w1">Dhivehi</span><span class="w2">Project</span></span>
     </div>
-    <button class="icon-btn" id="signOutBtn" title="Sign out" aria-label="Sign out">⏻</button>
+    <div class="topbar-actions">
+      <button class="usage-pill" id="usageBtn" type="button">Usage</button>
+      <button class="icon-btn" id="signOutBtn" title="Sign out" aria-label="Sign out">⏻</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="usageModal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span>Today's usage</span>
+        <button class="icon-btn small" id="usageCloseBtn" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="usage-bar-track"><div class="usage-bar-fill" id="usageBarFill"></div></div>
+      <div class="usage-text" id="usageText">Loading…</div>
+      <div class="usage-note">Each account gets a daily token allowance for translation and writing. It resets at midnight UTC.</div>
+    </div>
   </div>
 
   <main class="thread" id="thread">
@@ -509,6 +584,8 @@ const MODEL = 'gemini-3.6-flash';
 let supabaseClient = null;
 let currentSession = null;
 let authMode = 'signin';
+let dailyTokenLimit = 100000;
+let tokensUsedToday = 0;
 
 const loadingView = document.getElementById('loadingView');
 const authView = document.getElementById('authView');
@@ -549,17 +626,52 @@ async function initAuth(){
     return;
   }
 
+  if(cfg.dailyTokenLimit) dailyTokenLimit = cfg.dailyTokenLimit;
+
   supabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 
   const { data } = await supabaseClient.auth.getSession();
   currentSession = data.session;
   renderAuthState();
+  if(currentSession) refreshUsage();
 
   supabaseClient.auth.onAuthStateChange((_event, session)=>{
     currentSession = session;
     renderAuthState();
+    if(currentSession) refreshUsage();
   });
 }
+
+// ---- Usage tracking ----
+const usageBtn = document.getElementById('usageBtn');
+const usageModal = document.getElementById('usageModal');
+const usageCloseBtn = document.getElementById('usageCloseBtn');
+const usageBarFill = document.getElementById('usageBarFill');
+const usageText = document.getElementById('usageText');
+
+function renderUsage(){
+  const pct = dailyTokenLimit > 0 ? Math.min(100, (tokensUsedToday / dailyTokenLimit) * 100) : 0;
+  usageBarFill.style.width = pct + '%';
+  usageBarFill.classList.toggle('near-limit', pct >= 90);
+  usageText.textContent = tokensUsedToday.toLocaleString() + ' / ' + dailyTokenLimit.toLocaleString() + ' tokens used today';
+}
+
+async function refreshUsage(){
+  if(!supabaseClient || !currentSession) return;
+  try{
+    const { data, error } = await supabaseClient.rpc('get_today_usage');
+    if(!error && typeof data === 'number') tokensUsedToday = data;
+  } catch(e){ /* ignore, keep last known value */ }
+  renderUsage();
+}
+
+usageBtn.addEventListener('click', async ()=>{
+  usageModal.style.display = 'flex';
+  renderUsage();
+  await refreshUsage();
+});
+usageCloseBtn.addEventListener('click', ()=>{ usageModal.style.display = 'none'; });
+usageModal.addEventListener('click', (e)=>{ if(e.target === usageModal) usageModal.style.display = 'none'; });
 
 document.getElementById('googleSignInBtn').addEventListener('click', async ()=>{
   if(!supabaseClient) return;
@@ -744,6 +856,11 @@ async function handleSend(){
       body: JSON.stringify({ provider: PROVIDER, model: MODEL, system, message: text })
     });
     const data = await res.json();
+    if(data.usage && typeof data.usage.tokensUsed === 'number'){
+      tokensUsedToday = data.usage.tokensUsed;
+      if(data.usage.limit) dailyTokenLimit = data.usage.limit;
+      renderUsage();
+    }
     if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
     fillAssistant(placeholder, data.text || '(empty response)', isDvResult, false);
   } catch(err){
