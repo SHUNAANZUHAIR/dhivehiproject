@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dhivehi AI Prototype — Translate &amp; Write</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thaana&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14181c;
+    --panel:#1c2127;
+    --panel-2:#232a32;
+    --border:#2c343d;
+    --text:#e8edf2;
+    --muted:#93a0ac;
+    --accent:#39bbb0;
+    --accent-dark:#2a8a82;
+    --danger:#e2564f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+  }
+  .wrap{
+    max-width:900px;
+    margin:0 auto;
+    padding:28px 20px 60px;
+  }
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:22px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  header h1{
+    font-size:20px;
+    margin:0;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  header h1 span.badge{
+    font-size:11px;
+    font-weight:600;
+    color:var(--accent);
+    background:rgba(57,187,176,0.12);
+    border:1px solid rgba(57,187,176,0.35);
+    padding:2px 8px;
+    border-radius:20px;
+  }
+  .key-row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  input[type=password], input[type=text]{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:8px;
+    padding:8px 10px;
+    font-size:13px;
+    font-family:inherit;
+  }
+  select{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:8px;
+    padding:8px 10px;
+    font-size:13px;
+    font-family:inherit;
+  }
+  .key-row input[type=password]{width:230px;}
+  label.chk{
+    font-size:12px;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:5px;
+    cursor:pointer;
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:18px;
+    margin-bottom:18px;
+  }
+  .tabs{
+    display:flex;
+    gap:6px;
+    margin-bottom:16px;
+  }
+  .tab-btn{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--muted);
+    padding:9px 16px;
+    border-radius:9px;
+    cursor:pointer;
+    font-size:14px;
+    font-weight:600;
+    font-family:inherit;
+  }
+  .tab-btn.active{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#04211f;
+  }
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:6px;
+    font-weight:600;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+  }
+  textarea{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:10px;
+    padding:12px;
+    font-size:14px;
+    font-family:inherit;
+    resize:vertical;
+    min-height:110px;
+  }
+  .row{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .row .field{flex:1;min-width:160px;}
+  .dir-toggle{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .dir-toggle button{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 14px;
+    border-radius:9px;
+    cursor:pointer;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:600;
+  }
+  .dir-toggle button.active{
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+  .dir-toggle .swap{
+    background:none;
+    border:none;
+    color:var(--muted);
+    font-size:16px;
+    cursor:pointer;
+    padding:4px 8px;
+  }
+  .go-btn{
+    background:var(--accent);
+    border:none;
+    color:#04211f;
+    font-weight:700;
+    font-size:14px;
+    padding:11px 22px;
+    border-radius:9px;
+    cursor:pointer;
+    font-family:inherit;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+  }
+  .go-btn:disabled{opacity:.55;cursor:not-allowed;}
+  .go-btn:hover:not(:disabled){background:var(--accent-dark);}
+  .output-box{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px;
+    min-height:110px;
+    font-size:16px;
+    line-height:1.9;
+    white-space:pre-wrap;
+    font-family:'Noto Sans Thaana','Inter',sans-serif;
+  }
+  .output-box.dv{direction:rtl;text-align:right;font-size:19px;}
+  .output-box.empty{color:var(--muted);font-size:13px;font-family:'Inter',sans-serif;direction:ltr;text-align:left;}
+  .output-actions{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+  }
+  .mini-btn{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--muted);
+    padding:6px 12px;
+    border-radius:7px;
+    font-size:12px;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .mini-btn:hover{color:var(--text);border-color:var(--muted);}
+  .status{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:10px;
+    min-height:16px;
+  }
+  .status.error{color:var(--danger);}
+  .footer-note{
+    font-size:12px;
+    color:var(--muted);
+    text-align:center;
+    margin-top:24px;
+    line-height:1.6;
+  }
+  .footer-note a{color:var(--accent);text-decoration:none;}
+  .spinner{
+    width:14px;height:14px;
+    border:2px solid rgba(4,33,31,0.35);
+    border-top-color:#04211f;
+    border-radius:50%;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .model-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:2px;}
+  .model-row .field{flex:1;min-width:180px;margin-bottom:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>ދިވެހި AI <span class="badge">PROTOTYPE</span></h1>
+    <div class="key-row">
+      <input type="password" id="apiKey" placeholder="API key">
+      <label class="chk"><input type="checkbox" id="rememberKey"> remember in this browser</label>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="translate">Translate</button>
+      <button class="tab-btn" data-tab="write">Write in Dhivehi</button>
+    </div>
+
+    <div class="model-row">
+      <div class="field">
+        <label>Provider</label>
+        <select id="provider">
+          <option value="anthropic" selected>Anthropic (Claude)</option>
+          <option value="openai">OpenAI (ChatGPT)</option>
+          <option value="google">Google (Gemini)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <select id="model"></select>
+      </div>
+    </div>
+    <div class="status" id="keyHint" style="margin-top:-6px;margin-bottom:10px;"></div>
+
+    <!-- TRANSLATE TAB -->
+    <div id="tab-translate">
+      <div class="dir-toggle">
+        <button id="dirEnDv" class="active">English → Dhivehi</button>
+        <button class="swap" id="swapDir" title="Swap direction">⇄</button>
+        <button id="dirDvEn">Dhivehi → English</button>
+      </div>
+      <div class="field">
+        <label id="srcLabel">English text</label>
+        <textarea id="srcText" placeholder="Type or paste the text you want translated..."></textarea>
+      </div>
+      <button class="go-btn" id="translateBtn">Translate</button>
+      <div class="status" id="translateStatus"></div>
+      <div class="field" style="margin-top:16px;">
+        <label>Result</label>
+        <div class="output-box empty" id="translateOutput">Translation will appear here.</div>
+        <div class="output-actions">
+          <button class="mini-btn" id="copyTranslate">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- WRITE TAB -->
+    <div id="tab-write" style="display:none;">
+      <div class="row">
+        <div class="field">
+          <label>Content type</label>
+          <select id="writeType">
+            <option value="general write-up">General write-up</option>
+            <option value="essay">Essay</option>
+            <option value="letter">Letter</option>
+            <option value="speech">Speech</option>
+            <option value="social media post">Social media post</option>
+            <option value="short story">Short story</option>
+            <option value="poem">Poem</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Length</label>
+          <select id="writeLength">
+            <option value="short (roughly 100-150 words)">Short</option>
+            <option value="medium (roughly 250-400 words)" selected>Medium</option>
+            <option value="long (roughly 500-800 words)">Long</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tone</label>
+          <select id="writeTone">
+            <option value="neutral, natural">Neutral</option>
+            <option value="formal">Formal</option>
+            <option value="casual, friendly">Casual</option>
+            <option value="persuasive">Persuasive</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Topic / instructions (English or Dhivehi)</label>
+        <textarea id="writePrompt" placeholder="e.g. Write about the importance of protecting coral reefs in the Maldives"></textarea>
+      </div>
+      <button class="go-btn" id="writeBtn">Generate</button>
+      <div class="status" id="writeStatus"></div>
+      <div class="field" style="margin-top:16px;">
+        <label>Result</label>
+        <div class="output-box empty dv" id="writeOutput" style="direction:ltr;text-align:left;">Generated Dhivehi content will appear here.</div>
+        <div class="output-actions">
+          <button class="mini-btn" id="copyWrite">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    Your API key is only used to call the selected provider's API directly from this page in your browser — it is never sent anywhere else.<br>
+    Get a key: <a href="https://console.anthropic.com" target="_blank">Anthropic</a> · <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI</a> · <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>.<br>
+    This is a local prototype, not a hosted product. OpenAI/Google calls go straight from your browser too — if your key's org has browser calls locked down, you may see a CORS error.
+  </div>
+
+</div>
+
+<script>
+// ---- Provider / model catalog ----
+const PROVIDERS = {
+  anthropic: {
+    label: 'Anthropic',
+    keyPlaceholder: 'sk-ant-... (Anthropic API key)',
+    hint: 'Uses the Messages API with the direct-browser-access header.',
+    models: [
+      { value: 'claude-sonnet-5', label: 'Claude Sonnet 5 (recommended)' },
+      { value: 'claude-opus-5', label: 'Claude Opus 5 (highest quality)' },
+      { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest / cheapest)' }
+    ]
+  },
+  openai: {
+    label: 'OpenAI',
+    keyPlaceholder: 'sk-... (OpenAI API key)',
+    hint: 'Uses the Chat Completions API, called directly from your browser.',
+    models: [
+      { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra (recommended)' },
+      { value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol (highest quality)' },
+      { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna (fastest / cheapest)' }
+    ]
+  },
+  google: {
+    label: 'Google',
+    keyPlaceholder: 'AIza... (Google AI Studio API key)',
+    hint: 'Uses the Gemini generateContent API, called directly from your browser.',
+    models: [
+      { value: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (recommended)' },
+      { value: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (highest quality)' },
+      { value: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite (fastest / cheapest)' }
+    ]
+  }
+};
+
+const providerSelect = document.getElementById('provider');
+const modelSelect = document.getElementById('model');
+const apiKeyInput = document.getElementById('apiKey');
+const rememberKey = document.getElementById('rememberKey');
+const keyHint = document.getElementById('keyHint');
+
+function keyStorageKey(){ return 'dhivehi_proto_api_key_' + providerSelect.value; }
+
+function populateModels(){
+  const cfg = PROVIDERS[providerSelect.value];
+  modelSelect.innerHTML = '';
+  cfg.models.forEach(m=>{
+    const opt = document.createElement('option');
+    opt.value = m.value;
+    opt.textContent = m.label;
+    modelSelect.appendChild(opt);
+  });
+}
+
+function updateKeyUI(){
+  const cfg = PROVIDERS[providerSelect.value];
+  apiKeyInput.placeholder = cfg.keyPlaceholder;
+  keyHint.textContent = cfg.hint;
+  keyHint.classList.remove('error');
+}
+
+function loadKeyForProvider(){
+  const saved = localStorage.getItem(keyStorageKey());
+  if(saved){ apiKeyInput.value = saved; rememberKey.checked = true; }
+  else { apiKeyInput.value = ''; rememberKey.checked = false; }
+}
+
+function persistKeyIfNeeded(){
+  if (rememberKey.checked) localStorage.setItem(keyStorageKey(), apiKeyInput.value);
+  else localStorage.removeItem(keyStorageKey());
+}
+
+providerSelect.addEventListener('change', ()=>{
+  localStorage.setItem('dhivehi_proto_provider', providerSelect.value);
+  populateModels();
+  updateKeyUI();
+  loadKeyForProvider();
+});
+apiKeyInput.addEventListener('input', persistKeyIfNeeded);
+rememberKey.addEventListener('change', persistKeyIfNeeded);
+
+// ---- init provider/model/key state ----
+const savedProvider = localStorage.getItem('dhivehi_proto_provider');
+if (savedProvider && PROVIDERS[savedProvider]) providerSelect.value = savedProvider;
+populateModels();
+updateKeyUI();
+loadKeyForProvider();
+
+// ---- Tabs ----
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-translate').style.display = btn.dataset.tab==='translate' ? 'block':'none';
+    document.getElementById('tab-write').style.display = btn.dataset.tab==='write' ? 'block':'none';
+  });
+});
+
+// ---- Translate direction ----
+let direction = 'en-dv';
+const dirEnDv = document.getElementById('dirEnDv');
+const dirDvEn = document.getElementById('dirDvEn');
+const srcLabel = document.getElementById('srcLabel');
+const srcText = document.getElementById('srcText');
+function setDirection(d){
+  direction = d;
+  dirEnDv.classList.toggle('active', d==='en-dv');
+  dirDvEn.classList.toggle('active', d==='dv-en');
+  srcLabel.textContent = d==='en-dv' ? 'English text' : 'Dhivehi text';
+  srcText.style.direction = d==='dv-en' ? 'rtl' : 'ltr';
+  srcText.style.textAlign = d==='dv-en' ? 'right' : 'left';
+  srcText.style.fontFamily = d==='dv-en' ? "'Noto Sans Thaana','Inter',sans-serif" : "'Inter',sans-serif";
+  srcText.style.fontSize = d==='dv-en' ? '17px' : '14px';
+}
+dirEnDv.addEventListener('click', ()=>setDirection('en-dv'));
+dirDvEn.addEventListener('click', ()=>setDirection('dv-en'));
+document.getElementById('swapDir').addEventListener('click', ()=>setDirection(direction==='en-dv'?'dv-en':'en-dv'));
+
+// ---- Core API call (multi-provider) ----
+async function callAnthropic(model, key, systemPrompt, userMessage){
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: model,
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }]
+    })
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error((data && data.error && data.error.message) || ('HTTP ' + res.status));
+  return (data.content && data.content[0] && data.content[0].text) || '';
+}
+
+async function callOpenAI(model, key, systemPrompt, userMessage){
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'Authorization': 'Bearer ' + key
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ]
+    })
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error((data && data.error && data.error.message) || ('HTTP ' + res.status));
+  return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+}
+
+async function callGemini(model, key, systemPrompt, userMessage){
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(key);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }]
+    })
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error((data && data.error && data.error.message) || ('HTTP ' + res.status));
+  const cand = data.candidates && data.candidates[0];
+  const parts = cand && cand.content && cand.content.parts;
+  return (parts && parts.map(p=>p.text||'').join('')) || '';
+}
+
+async function callModel(systemPrompt, userMessage, statusEl){
+  const provider = providerSelect.value;
+  const model = modelSelect.value;
+  const key = apiKeyInput.value.trim();
+  if(!key){
+    setStatus(statusEl, 'Enter your ' + PROVIDERS[provider].label + ' API key above first.', true);
+    return null;
+  }
+  try{
+    if(provider === 'anthropic') return await callAnthropic(model, key, systemPrompt, userMessage);
+    if(provider === 'openai') return await callOpenAI(model, key, systemPrompt, userMessage);
+    if(provider === 'google') return await callGemini(model, key, systemPrompt, userMessage);
+    throw new Error('Unknown provider');
+  } catch(err){
+    setStatus(statusEl, 'Error: ' + err.message, true);
+    return null;
+  }
+}
+
+function setStatus(el, text, isError){
+  el.textContent = text;
+  el.classList.toggle('error', !!isError);
+}
+function setLoading(btn, loading, labelWhileLoading, labelDefault){
+  btn.disabled = loading;
+  btn.innerHTML = loading ? '<span class="spinner"></span> ' + labelWhileLoading : labelDefault;
+}
+
+// ---- Translate ----
+const translateBtn = document.getElementById('translateBtn');
+const translateStatus = document.getElementById('translateStatus');
+const translateOutput = document.getElementById('translateOutput');
+
+translateBtn.addEventListener('click', async ()=>{
+  const text = srcText.value.trim();
+  if(!text){ setStatus(translateStatus, 'Enter some text to translate.', true); return; }
+  setStatus(translateStatus, '');
+  setLoading(translateBtn, true, 'Translating...', 'Translate');
+
+  const targetLang = direction === 'en-dv' ? 'Dhivehi (Thaana script)' : 'English';
+  const system = `You are an expert professional translator specializing in Dhivehi (the Maldivian language, written in Thaana script) and English. Translate the user's text into ${targetLang}. Preserve tone, meaning, and register. Output ONLY the translated text, in the correct script, with no preamble, explanation, or quotation marks around it.`;
+
+  const result = await callModel(system, text, translateStatus);
+  setLoading(translateBtn, false, '', 'Translate');
+
+  if(result !== null){
+    translateOutput.textContent = result;
+    translateOutput.classList.remove('empty');
+    const isDv = direction === 'en-dv';
+    translateOutput.classList.toggle('dv', isDv);
+    translateOutput.style.direction = isDv ? 'rtl' : 'ltr';
+    translateOutput.style.textAlign = isDv ? 'right' : 'left';
+    setStatus(translateStatus, 'Done.');
+  }
+});
+
+document.getElementById('copyTranslate').addEventListener('click', ()=>{
+  navigator.clipboard.writeText(translateOutput.textContent || '');
+  setStatus(translateStatus, 'Copied to clipboard.');
+});
+
+// ---- Write ----
+const writeBtn = document.getElementById('writeBtn');
+const writeStatus = document.getElementById('writeStatus');
+const writeOutput = document.getElementById('writeOutput');
+
+writeBtn.addEventListener('click', async ()=>{
+  const prompt = document.getElementById('writePrompt').value.trim();
+  if(!prompt){ setStatus(writeStatus, 'Enter a topic or instructions first.', true); return; }
+  setStatus(writeStatus, '');
+  setLoading(writeBtn, true, 'Writing...', 'Generate');
+
+  const type = document.getElementById('writeType').value;
+  const length = document.getElementById('writeLength').value;
+  const tone = document.getElementById('writeTone').value;
+
+  const system = `You are a skilled native Dhivehi writer. Write fluent, natural, grammatically correct Dhivehi using proper Thaana script. Do not transliterate or use Latin characters. The content type is: ${type}. Target length: ${length}. Tone: ${tone}. Output ONLY the finished Dhivehi content, with no English preamble, explanation, or notes.`;
+
+  const result = await callModel(system, prompt, writeStatus);
+  setLoading(writeBtn, false, '', 'Generate');
+
+  if(result !== null){
+    writeOutput.textContent = result;
+    writeOutput.classList.remove('empty');
+    writeOutput.style.direction = 'rtl';
+    writeOutput.style.textAlign = 'right';
+    writeOutput.style.fontFamily = "'Noto Sans Thaana','Inter',sans-serif";
+    writeOutput.style.fontSize = '19px';
+    setStatus(writeStatus, 'Done.');
+  }
+});
+
+document.getElementById('copyWrite').addEventListener('click', ()=>{
+  navigator.clipboard.writeText(writeOutput.textContent || '');
+  setStatus(writeStatus, 'Copied to clipboard.');
+});
+</script>
+</body>
+</html>
